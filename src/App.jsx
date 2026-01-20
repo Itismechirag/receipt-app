@@ -3,7 +3,6 @@ import { useReactToPrint } from 'react-to-print';
 import SignatureCanvas from 'react-signature-canvas';
 import numWords from 'num-words';
 import './App.css';
-import billTemplate from './assets/billtemplate.png';
 
 
 const App = () => {
@@ -137,7 +136,7 @@ const App = () => {
       {/* The Printable Receipt Template */}
       <div className="preview-panel">
         <div ref={componentRef} className="receipt-template">
-          <img src={billTemplate} alt="Template" className="bg-image" />
+          <img src="/billtemplate.png" alt="Template" className="bg-image" />
 
 
           <span className="field bill-no">{formData.billNo}</span>
