@@ -19,7 +19,7 @@ const App = () => {
 
 
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Display billNo (editable for current bill)
   const [displayBillNo, setDisplayBillNo] = useState(() => {
@@ -187,6 +187,41 @@ const App = () => {
     }
   };
 
+  const handleBackupData = () => {
+    const dataStr = JSON.stringify(savedBills, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `bill_records_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
+  const handleRestoreData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const restoredBills = JSON.parse(event.target.result);
+        if (Array.isArray(restoredBills)) {
+          setSavedBills(restoredBills);
+          localStorage.setItem('savedBills', JSON.stringify(restoredBills));
+          alert("Success! History has been restored.");
+        }
+      } catch (err) {
+        alert("Error: This is not a valid backup file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+
 
   return (
     <div className="container">
@@ -338,6 +373,31 @@ const App = () => {
           </p>
         </div> */}
             </div>
+            {/* Inside your settings-content div */}
+            <div className="backup-section">
+              <p className="section-label">Data Management:</p>
+
+              {/* Download Button */}
+              <button onClick={handleBackupData} className="backup-btn">
+                💾 Download Backup
+              </button>
+
+              {/* Restore "Button" (Hidden Input + Styled Label) */}
+              <div className="restore-container">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleRestoreData}
+                  id="restore-input"
+                  className="hidden-file-input"
+                />
+                <label htmlFor="restore-input" className="restore-btn-label">
+                  📂 Restore History
+                </label>
+              </div>
+            </div>
+
+
           </div>
         )}
 

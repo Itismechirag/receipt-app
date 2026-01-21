@@ -483,3 +483,64 @@
   font-weight: bold;
   cursor: pointer;
 }
+
+.backup-section {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 5px;
+}
+
+/* Reduced height backup button */
+.backup-btn {
+  width: 100%;
+  padding: 8px 12px; /* Slimmer padding */
+  background: #212529; /* Dark professional look */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.backup-btn:hover {
+  background: #343a40;
+}
+
+/* Styled File Input Label */
+.restore-btn-label {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  color: #495057;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  box-sizing: border-box; /* Ensures padding doesn't break width */
+  transition: all 0.2s;
+}
+
+.restore-btn-label:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.hidden-file-input {
+  display: none; /* Keeps it functional but invisible */
+}
