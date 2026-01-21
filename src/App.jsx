@@ -4,42 +4,125 @@ import SignatureCanvas from 'react-signature-canvas';
 import numWords from 'num-words';
 import './App.css';
 
-
 const App = () => {
   const componentRef = useRef();
   const sigCanvas = useRef();
 
-  // State for the Bill Number with localStorage persistence
+  // At the top of App.jsx
+  const searchPrintRef = useRef();
+
+  const handlePrintSearch = useReactToPrint({
+    contentRef: searchPrintRef,
+  });
+
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+
+  // Display billNo (editable for current bill)
+  const [displayBillNo, setDisplayBillNo] = useState(() => {
+    return Number(localStorage.getItem('displayBillNo')) || Number(localStorage.getItem('persistentCounter')) || 1;
+  });
+
+  // Persistent counter (for Next Bill logic)
+  const [persistentCounter, setPersistentCounter] = useState(() =>
+    Number(localStorage.getItem('persistentCounter')) || 1
+  );
+
+  // Form data (resets on Next Bill)
   const [formData, setFormData] = useState({
-    billNo: Number(localStorage.getItem('lastBillNo')) + 1 || 1,
     date: new Date().toISOString().split('T')[0],
     title: '',
     name: '',
     amount: '',
-    paymentMode: 'Cash',
+    paymentMode: '',
     onAccount: '',
     secondDate: new Date().toISOString().split('T')[0],
     signature: null
   });
+
+  // Sync billNo to localStorage
+  useEffect(() => {
+    localStorage.setItem('persistentCounter', persistentCounter.toString());
+    localStorage.setItem('displayBillNo', displayBillNo.toString());
+  }, [persistentCounter, displayBillNo]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // NEW: Next Bill function
+  const handleNextBill = () => {
+    // 1. Commit current bill to history (Saved Bills)
+    const currentRecord = {
+      billNo: displayBillNo,
+      ...formData
+    };
+
+    // Only save if some details are entered
+    if (formData.name || formData.amount) {
+      const updatedHistory = [...savedBills, currentRecord];
+      setSavedBills(updatedHistory);
+      localStorage.setItem('savedBills', JSON.stringify(updatedHistory));
+    }
+
+    // 2. Increment the persistent counter
+    const nextPersistent = persistentCounter + 1;
+    setPersistentCounter(nextPersistent);
+    setDisplayBillNo(nextPersistent);
+
+    // 3. CLEAR ALL FORM ENTRIES
+    setFormData({
+      date: new Date().toISOString().split('T')[0],       // Resets to today
+      title: '',                                          // Clears Mr./Mrs.
+      name: '',                                           // Clears Patient Name
+      amount: '',                                         // Clears Amount
+      paymentMode: '',                                // Resets to default
+      onAccount: '',                                      // Clears description
+      secondDate: new Date().toISOString().split('T')[0], // Resets to today
+      signature: null                                     // Clears saved signature data
+    });
+
+    // 4. CLEAR THE DRAWING PAD
+    if (sigCanvas.current) {
+      sigCanvas.current.clear();                          // Physically wipes the canvas
+    }
+  };
+
+
+
+  // NEW: Reset Counter state
+  const [showResetCounter, setShowResetCounter] = useState(false);
+  const [newCounter, setNewCounter] = useState('');
+
+  const handleResetCounter = () => {
+    if (newCounter && !isNaN(newCounter)) {
+      setPersistentCounter(Number(newCounter));  // Only changes persistent counter
+      setDisplayBillNo(Number(newCounter));
+
+      setShowResetCounter(false);
+      setNewCounter('');
+    }
+  };
+
+  // State to hold all previous bills
+  const [savedBills, setSavedBills] = useState(() => {
+    return JSON.parse(localStorage.getItem('savedBills')) || [];
+  });
+
+  // Modal state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+
+
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
-    onAfterPrint: () => {
-      // Increment and save the number only after a successful print
-      const nextNo = Number(formData.billNo);
-      localStorage.setItem('lastBillNo', nextNo);
-      setFormData(prev => ({ ...prev, billNo: nextNo + 1 }));
-    }
+    // Removed auto-increment from print (now only on Next Bill)
   });
 
   const saveSignature = () => {
     if (!sigCanvas.current.isEmpty()) {
-      // Use toDataURL() directly on the ref, not getTrimmedCanvas()
       setFormData(prev => ({
         ...prev,
         signature: sigCanvas.current.toDataURL('image/png')
@@ -50,12 +133,6 @@ const App = () => {
   const clearSignature = () => {
     sigCanvas.current.clear();
     setFormData(prev => ({ ...prev, signature: null }));
-  };
-
-  const formatToDDMMYYYY = (isoDate) => {
-    if (!isoDate) return '';
-    const [year, month, day] = isoDate.split('-'); // "2026-01-20"
-    return `${day}-${month}-${year}`;             // "20-01-2026"
   };
 
   const handleSignatureUpload = (e) => {
@@ -72,16 +149,55 @@ const App = () => {
     }
   };
 
+  const formatToDDMMYYYY = (isoDate) => {
+    if (!isoDate) return '';
+    const [year, month, day] = isoDate.split('-');
+    return `${day}-${month}-${year}`;
+  };
+
+  const performSearch = () => {
+    const result = savedBills.find(bill => bill.billNo === Number(searchQuery));
+    setSearchResult(result || "Not Found");
+  };
+
+
+  const handleDeleteBill = (billNoToDelete) => {
+    // Confirm with the user first
+    const isConfirmed = window.confirm(`Are you sure you want to delete Bill No. ${billNoToDelete}? This action cannot be undone.`);
+
+    if (isConfirmed) {
+      // 1. Filter out the specific bill from the array
+      const updatedHistory = savedBills.filter(bill => bill.billNo !== billNoToDelete);
+
+      // 2. Update state and localStorage
+      setSavedBills(updatedHistory);
+      localStorage.setItem('savedBills', JSON.stringify(updatedHistory));
+
+      // 3. Clear the search result so the modal updates
+      setSearchResult(null);
+      setSearchQuery('');
+      alert(`Bill No. ${billNoToDelete} has been deleted.`);
+    }
+  };
+
 
   return (
     <div className="container">
+      {/* LEFT: Your existing form */}
       <div className="form-panel">
         <h2>Receipt Generator</h2>
         <div className="input-group">
           <label>Bill No:</label>
-          <input type="number" name="billNo" value={formData.billNo} onChange={handleChange} />
+          <input
+            type="number"
+            value={displayBillNo}
+            onChange={(e) => setDisplayBillNo(Number(e.target.value))}
+            className="bill-no-input"
+          />
         </div>
 
+
+        {/* All your existing form fields unchanged */}
         <div className="input-group">
           <label>Date:</label>
           <input type="date" name="date" value={formData.date} onChange={handleChange} />
@@ -95,8 +211,22 @@ const App = () => {
           </datalist>
         </div>
 
-        <input type="text" name="name" placeholder="Received With Thanks From..." onChange={handleChange} />
-        <input type="number" name="amount" placeholder="Amount (₹)" onChange={handleChange} />
+        <input
+          type="text"
+          name="name"
+          placeholder="Received With Thanks From..."
+          value={formData.name}   // <--- ADD THIS
+          onChange={handleChange}
+        />
+
+        <input
+          type="number"
+          name="amount"
+          placeholder="Amount (₹)"
+          value={formData.amount} // <--- ADD THIS
+          onChange={handleChange}
+        />
+
 
         <div className="input-group">
           <label>Payment Mode:</label>
@@ -106,58 +236,194 @@ const App = () => {
           </datalist>
         </div>
 
-        <input type="text" name="onAccount" placeholder="On Account Of..." onChange={handleChange} />
+        <input
+          type="text"
+          name="onAccount"
+          placeholder="On Account Of..."
+          value={formData.onAccount} // <--- ADD THIS
+          onChange={handleChange}
+        />
 
-        <div className="sig-container">
+        {/* NEW: Explicit input for Footer Date */}
+        <div className="input-group">
+          <label>Footer Date:</label>
+          <input type="date" name="secondDate" value={formData.secondDate} onChange={handleChange} />
+        </div>
+
+        {/* <div className="sig-container">
           <label>Digital Signature:</label>
           <SignatureCanvas ref={sigCanvas} canvasProps={{ className: 'sigPad' }} />
-
           <div className="sig-buttons">
             <button onClick={saveSignature}>Add Signature</button>
             <button onClick={clearSignature}>Clear</button>
           </div>
-
-          {/* Upload option */}
           <div className="upload-sig">
             <label>Or Upload Signature Image:</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleSignatureUpload}
-              className="file-input"
-            />
+            <input type="file" accept="image/*" onChange={handleSignatureUpload} className="file-input" />
           </div>
-        </div>
-
+        </div> */}
 
         <button className="print-btn" onClick={handlePrint}>Print A5 Receipt</button>
+
+        {/* NEW: Next Bill Button */}
+        <button className="next-bill-btn" onClick={handleNextBill}>Next Bill</button>
+
       </div>
 
-      {/* The Printable Receipt Template */}
+      {/* CENTER: Your existing preview (updated billNo) */}
       <div className="preview-panel">
         <div ref={componentRef} className="receipt-template">
           <img src="/billtemplate.png" alt="Template" className="bg-image" />
-
-
-          <span className="field bill-no">{formData.billNo}</span>
+          <span className="field bill-no">{displayBillNo}</span>
           <span className="field receipt-date">{formatToDDMMYYYY(formData.date)}</span>
           <span className="field client-name">{formData.title} {formData.name}</span>
           <span className="field amount-words">
-            {formData.amount
+            {formData.amount && !isNaN(formData.amount)
               ? numWords(parseInt(formData.amount, 10)).toUpperCase() + " RUPEES ONLY"
               : ""}
           </span>
-
           <span className="field pay-mode">{formData.paymentMode}</span>
           <span className="field account-details">{formData.onAccount}</span>
-          <span className="field footer-date">{formData.secondDate}</span>
+          <span className="field footer-date">{formatToDDMMYYYY(formData.secondDate)}</span>
           <span className="field amount-box">{formData.amount !== '' ? `${formData.amount}/-` : ''}</span>
-
           {formData.signature && (
             <img src={formData.signature} alt="Sig" className="field signature-img" />
           )}
         </div>
       </div>
+
+      {/* RIGHT: Collapsible Settings Panel */}
+      <div className={`settings-panel ${isSettingsOpen ? 'open' : 'collapsed'}`}>
+        {/* Header is always visible; clicking it toggles the panel */}
+        <div className="settings-header" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>
+          <h3>⚙️ Settings</h3>
+          <span className="toggle-icon">{isSettingsOpen ? '−' : '+'}</span>
+        </div>
+
+        {/* Content only renders when open */}
+        {isSettingsOpen && (
+          <div className="settings-content">
+            <div className="counter-section">
+              <button
+                className="reset-counter-btn"
+                onClick={() => setShowResetCounter(!showResetCounter)}
+              >
+                {showResetCounter ? 'Cancel' : 'Reset Counter'}
+              </button>
+
+              {showResetCounter && (
+                <div className="set-counter-form">
+                  <input
+                    type="number"
+                    value={newCounter}
+                    onChange={(e) => setNewCounter(e.target.value)}
+                    placeholder="New No."
+                    className="counter-input"
+                  />
+                  <button onClick={handleResetCounter} className="set-btn">Set</button>
+                </div>
+              )}
+
+              {/* <div className="current-counter-box">
+          Current Counter Base: <strong>{persistentCounter}</strong>
+          <p style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
+            (Next Bill will be {persistentCounter + 1})
+          </p>
+        </div> */}
+            </div>
+          </div>
+        )}
+
+        <div className="permanent-settings-footer">
+          <button
+            className="search-trigger-btn"
+            onClick={() => setIsSearchOpen(true)}
+          >
+            🔍 Search Bills
+          </button>
+        </div>
+      </div>
+
+
+
+      {isSearchOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Search Bill Records</h3>
+              <button className="close-btn" onClick={() => { setIsSearchOpen(false); setSearchResult(null); setSearchQuery(''); }}>×</button>
+            </div>
+
+            <div className="search-bar">
+              <input
+                type="number"
+                placeholder="Enter Bill No."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button onClick={performSearch}>Search</button>
+            </div>
+
+            <div className="search-results">
+              {searchResult === "Not Found" && <p className="error">No bill found with that number.</p>}
+              {searchResult && searchResult !== "Not Found" && (
+                <div className="bill-details">
+                  <p><strong>Bill No:</strong> {searchResult.billNo}</p>
+                  <p><strong>Receipt Date:</strong> {formatToDDMMYYYY(searchResult.date)}</p>
+                  <p><strong>Footer Date:</strong> {formatToDDMMYYYY(searchResult.secondDate)}</p>
+                  <p><strong>Customer:</strong> {searchResult.title} {searchResult.name}</p>
+                  <p><strong>Amount:</strong> ₹{searchResult.amount}</p>
+                  <p><strong>Mode:</strong> {searchResult.paymentMode}</p>
+                  <p><strong>On Account:</strong> {searchResult.onAccount}</p>
+                  {searchResult.signature && (
+                    <div className="saved-sig">
+                      <strong>Signature:</strong><br />
+                      <img src={searchResult.signature} alt="Saved Sig" style={{ height: '40px' }} />
+                    </div>
+                  )}
+
+                  <div className="search-action-buttons">
+                    <button className="print-btn" onClick={handlePrintSearch} style={{ marginTop: '15px', background: '#28a745' }}>
+                      🖨️ Print This Bill
+                    </button>
+
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteBill(searchResult.billNo)}
+                      style={{ flex: 1, background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', margin: '0px 10px' }}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+
+                  {/* HIDDEN PRINT COMPONENT: This replicates your template but for the printer only */}
+                  <div style={{ display: 'none' }}>
+                    <div ref={searchPrintRef} className="receipt-template">
+                      <img src="/billtemplate.png" alt="Template" className="bg-image" />
+                      <span className="field bill-no">{searchResult.billNo}</span>
+                      <span className="field receipt-date">{formatToDDMMYYYY(searchResult.date)}</span>
+                      <span className="field client-name">{searchResult.title} {searchResult.name}</span>
+                      <span className="field amount-words">
+                        {searchResult.amount ? numWords(parseInt(searchResult.amount, 10)).toUpperCase() + " RUPEES ONLY" : ""}
+                      </span>
+                      <span className="field pay-mode">{searchResult.paymentMode}</span>
+                      <span className="field account-details">{searchResult.onAccount}</span>
+                      <span className="field footer-date">{formatToDDMMYYYY(searchResult.secondDate)}</span>
+                      <span className="field amount-box">{searchResult.amount}/-</span>
+                      {searchResult.signature && (
+                        <img src={searchResult.signature} alt="Sig" className="field signature-img" />
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
