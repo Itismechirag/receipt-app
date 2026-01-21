@@ -426,3 +426,60 @@
 }
 
 
+.show-all-btn {
+  width: 100%;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+.bills-list {
+  margin-top: 10px;
+  max-height: 350px; /* Scrollable list */
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.bill-list-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 15px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  background: rgb(20, 19, 19);
+}
+
+.bill-list-item:hover {
+  background: #6b6c6e;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  margin-bottom: 15px;
+  font-weight: bold;
+  padding: 0;
+}
+
+.search-action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.search-action-buttons button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}

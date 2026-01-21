@@ -15,6 +15,9 @@ const App = () => {
     contentRef: searchPrintRef,
   });
 
+  const [isListView, setIsListView] = useState(false); // New state for toggling view
+
+
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
 
@@ -53,41 +56,45 @@ const App = () => {
 
   // NEW: Next Bill function
   const handleNextBill = () => {
-    // 1. Commit current bill to history (Saved Bills)
+    // 1. Validation: Only proceed if 'Received With Thanks From' (name) is NOT empty
+    if (!formData.name || formData.name.trim() === "") {
+      alert("Please enter a Customer Name before moving to the next bill.");
+      return; // Stop here; don't save or increment
+    }
+
+    // 2. Commit current bill to history (Saved Bills)
     const currentRecord = {
       billNo: displayBillNo,
       ...formData
     };
 
-    // Only save if some details are entered
-    if (formData.name || formData.amount) {
-      const updatedHistory = [...savedBills, currentRecord];
-      setSavedBills(updatedHistory);
-      localStorage.setItem('savedBills', JSON.stringify(updatedHistory));
-    }
+    const updatedHistory = [...savedBills, currentRecord];
+    setSavedBills(updatedHistory);
+    localStorage.setItem('savedBills', JSON.stringify(updatedHistory));
 
-    // 2. Increment the persistent counter
+    // 3. INCREMENT ONLY AFTER VALIDATION
     const nextPersistent = persistentCounter + 1;
     setPersistentCounter(nextPersistent);
     setDisplayBillNo(nextPersistent);
 
-    // 3. CLEAR ALL FORM ENTRIES
+    // 4. CLEAR ALL FORM ENTRIES
     setFormData({
-      date: new Date().toISOString().split('T')[0],       // Resets to today
-      title: '',                                          // Clears Mr./Mrs.
-      name: '',                                           // Clears Patient Name
-      amount: '',                                         // Clears Amount
-      paymentMode: '',                                // Resets to default
-      onAccount: '',                                      // Clears description
-      secondDate: new Date().toISOString().split('T')[0], // Resets to today
-      signature: null                                     // Clears saved signature data
+      date: new Date().toISOString().split('T')[0],
+      title: '',
+      name: '',
+      amount: '',
+      paymentMode: '',
+      onAccount: '',
+      secondDate: new Date().toISOString().split('T')[0],
+      signature: null
     });
 
-    // 4. CLEAR THE DRAWING PAD
+    // 5. CLEAR THE DRAWING PAD
     if (sigCanvas.current) {
-      sigCanvas.current.clear();                          // Physically wipes the canvas
+      sigCanvas.current.clear();
     }
   };
+
 
 
 
@@ -350,79 +357,95 @@ const App = () => {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3>Search Bill Records</h3>
-              <button className="close-btn" onClick={() => { setIsSearchOpen(false); setSearchResult(null); setSearchQuery(''); }}>×</button>
+              <h3>{isListView ? 'All Bill Records' : (searchResult && searchResult !== "Not Found" ? 'Bill Details' : 'Search Bills')}</h3>
+              <button className="close-btn" onClick={() => {
+                setIsSearchOpen(false);
+                setSearchResult(null);
+                setSearchQuery('');
+                setIsListView(false);
+              }}>×</button>
             </div>
 
-            <div className="search-bar">
-              <input
-                type="number"
-                placeholder="Enter Bill No."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <button onClick={performSearch}>Search</button>
-            </div>
+            {/* 1. DETAIL VIEW: Only shows if searchResult has a valid bill object */}
+            {searchResult && searchResult !== "Not Found" ? (
+              <div className="bill-details">
+                <button className="back-btn" onClick={() => setSearchResult(null)}>← Back</button>
+                <p><strong>Bill No:</strong> {searchResult.billNo}</p>
+                <p><strong>Receipt Date:</strong> {formatToDDMMYYYY(searchResult.date)}</p>
+                <p><strong>Footer Date:</strong> {formatToDDMMYYYY(searchResult.secondDate)}</p>
+                <p><strong>Customer:</strong> {searchResult.title} {searchResult.name}</p>
+                <p><strong>Amount:</strong> ₹{searchResult.amount}</p>
+                <p><strong>Mode:</strong> {searchResult.paymentMode}</p>
+                <p><strong>On Account:</strong> {searchResult.onAccount}</p>
 
-            <div className="search-results">
-              {searchResult === "Not Found" && <p className="error">No bill found with that number.</p>}
-              {searchResult && searchResult !== "Not Found" && (
-                <div className="bill-details">
-                  <p><strong>Bill No:</strong> {searchResult.billNo}</p>
-                  <p><strong>Receipt Date:</strong> {formatToDDMMYYYY(searchResult.date)}</p>
-                  <p><strong>Footer Date:</strong> {formatToDDMMYYYY(searchResult.secondDate)}</p>
-                  <p><strong>Customer:</strong> {searchResult.title} {searchResult.name}</p>
-                  <p><strong>Amount:</strong> ₹{searchResult.amount}</p>
-                  <p><strong>Mode:</strong> {searchResult.paymentMode}</p>
-                  <p><strong>On Account:</strong> {searchResult.onAccount}</p>
-                  {searchResult.signature && (
-                    <div className="saved-sig">
-                      <strong>Signature:</strong><br />
-                      <img src={searchResult.signature} alt="Saved Sig" style={{ height: '40px' }} />
-                    </div>
-                  )}
-
-                  <div className="search-action-buttons">
-                    <button className="print-btn" onClick={handlePrintSearch} style={{ marginTop: '15px', background: '#28a745' }}>
-                      🖨️ Print This Bill
-                    </button>
-
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDeleteBill(searchResult.billNo)}
-                      style={{ flex: 1, background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', margin: '0px 10px' }}
-                    >
-                      🗑️ Delete
-                    </button>
-                  </div>
-
-                  {/* HIDDEN PRINT COMPONENT: This replicates your template but for the printer only */}
-                  <div style={{ display: 'none' }}>
-                    <div ref={searchPrintRef} className="receipt-template">
-                      <img src="/billtemplate.png" alt="Template" className="bg-image" />
-                      <span className="field bill-no">{searchResult.billNo}</span>
-                      <span className="field receipt-date">{formatToDDMMYYYY(searchResult.date)}</span>
-                      <span className="field client-name">{searchResult.title} {searchResult.name}</span>
-                      <span className="field amount-words">
-                        {searchResult.amount ? numWords(parseInt(searchResult.amount, 10)).toUpperCase() + " RUPEES ONLY" : ""}
-                      </span>
-                      <span className="field pay-mode">{searchResult.paymentMode}</span>
-                      <span className="field account-details">{searchResult.onAccount}</span>
-                      <span className="field footer-date">{formatToDDMMYYYY(searchResult.secondDate)}</span>
-                      <span className="field amount-box">{searchResult.amount}/-</span>
-                      {searchResult.signature && (
-                        <img src={searchResult.signature} alt="Sig" className="field signature-img" />
-                      )}
-                    </div>
-                  </div>
-
+                <div className="search-action-buttons" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                  <button onClick={handlePrintSearch} style={{ flex: 1, background: '#28a745', color: 'white', padding: '10px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                    🖨️ Print
+                  </button>
+                  <button onClick={() => handleDeleteBill(searchResult.billNo)} style={{ flex: 1, background: '#dc3545', color: 'white', padding: '10px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                    🗑️ Delete
+                  </button>
                 </div>
 
-              )}
-            </div>
+                {/* Hidden Print Component */}
+                <div style={{ display: 'none' }}>
+                  <div ref={searchPrintRef} className="receipt-template">
+                    <img src="/billtemplate.png" alt="Template" className="bg-image" />
+                    <span className="field bill-no">{searchResult.billNo}</span>
+                    <span className="field receipt-date">{formatToDDMMYYYY(searchResult.date)}</span>
+                    <span className="field client-name">{searchResult.title} {searchResult.name}</span>
+                    <span className="field amount-words">
+                      {searchResult.amount ? numWords(parseInt(searchResult.amount, 10)).toUpperCase() + " RUPEES ONLY" : ""}
+                    </span>
+                    <span className="field pay-mode">{searchResult.paymentMode}</span>
+                    <span className="field account-details">{searchResult.onAccount}</span>
+                    <span className="field footer-date">{formatToDDMMYYYY(searchResult.secondDate)}</span>
+                    <span className="field amount-box">{searchResult.amount}/-</span>
+                    {searchResult.signature && <img src={searchResult.signature} alt="Sig" className="field signature-img" />}
+                  </div>
+                </div>
+              </div>
+            ) : isListView ? (
+              /* 2. LIST VIEW: Shows all bills when "Show All" is clicked */
+              <div className="bills-list-view">
+                <button className="back-btn" onClick={() => setIsListView(false)}>← Back to Search</button>
+                <div className="bills-list" style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #eee' }}>
+                  {savedBills.length === 0 ? <p style={{ padding: '20px' }}>No bills saved yet.</p> :
+                    savedBills.map((bill) => (
+                      <div key={bill.billNo} className="bill-list-item" onClick={() => setSearchResult(bill)}
+                        style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', borderBottom: '1px solid #eee', cursor: 'pointer' }}>
+                        <span><strong>No. {bill.billNo}</strong></span>
+                        <span>{bill.name}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            ) : (
+              /* 3. INITIAL SEARCH VIEW: Search bar and Show All button */
+              <div className="search-init">
+                <div className="search-bar" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                  <input
+                    type="number"
+                    placeholder="Enter Bill No."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ flex: 1, padding: '8px' }}
+                  />
+                  <button onClick={performSearch} style={{ padding: '8px 15px' }}>Search</button>
+                </div>
+
+                {searchResult === "Not Found" && <p style={{ color: 'red', marginBottom: '10px' }}>No bill found with that number.</p>}
+
+                <button onClick={() => setIsListView(true)} style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  📋 Show All Bills
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
+
 
     </div>
   );
