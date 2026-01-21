@@ -305,8 +305,8 @@ const App = () => {
           </div>
         </div> */}
 
-        <button className="print-btn" onClick={handlePrint}>Print A5 Receipt</button>
-
+        <button className="print-btn" onClick={handlePrint}>🖨️ Print A5 Receipt</button>
+ 
         {/* NEW: Next Bill Button */}
         <button className="next-bill-btn" onClick={handleNextBill}>Next Bill</button>
 
